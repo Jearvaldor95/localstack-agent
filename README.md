@@ -94,13 +94,13 @@ Escanea los archivos de código fuente (`.js`, `.ts`, `.java`, `.py`, `.go`, `.c
 
 Busca un archivo `application.yaml` o `application.yml` en el proyecto y extrae los nombres de recursos:
 
-| Clave YAML buscada                          | Recurso       |
-|---------------------------------------------|---------------|
-| `table-name`, `tablename`                   | Tabla DynamoDB |
-| `queue-name`, `queuename`, `queue-url`      | Cola SQS      |
-| `bucket-name`, `bucketname`                 | Bucket S3     |
-| `topic-name`, `topicname`, `topic-arn`      | Topic SNS     |
-| `role-name`, `rolename`                     | Rol IAM       |
+| Sección YAML              | Criterio                                      | Recurso        |
+|---------------------------|-----------------------------------------------|----------------|
+| `aws.dynamodb.*`          | Todos los valores (excepto `endpoint`)        | Tabla DynamoDB |
+| `aws.sqs.*`               | Todos los valores (excepto `endpoint`)        | Cola SQS       |
+| `aws.s3.*-bucket-name`    | Claves que terminen en `bucket-name`          | Bucket S3      |
+| `topic-name`, `topic-arn` | Claves con ese nombre en cualquier nivel      | Topic SNS      |
+| `role-name`, `rolename`   | Claves con ese nombre en cualquier nivel      | Rol IAM        |
 
 Resuelve placeholders de Spring Boot (`${VAR:default}` → `default`) y descarta URLs, ARNs y rutas.
 

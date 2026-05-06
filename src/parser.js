@@ -105,9 +105,24 @@ function parse(rootDir = process.cwd()) {
   const flat = flattenKeys(raw);
   const resources = {};
 
-  const tables  = extractNames(flat, /table-name|tablename/i);
-  const queues  = extractNames(flat, /queue-name|queuename|queue-url/i);
-  const buckets = extractNames(flat, /bucket-name|bucketname/i);
+  // Captura todos los valores bajo aws.dynamodb.* excepto endpoint
+  const tables = Object.entries(flat)
+    .filter(([k]) => /^aws\.dynamodb\./i.test(k) && !/endpoint$/i.test(k))
+    .map(([, v]) => resolveSpring(v))
+    .filter(isResourceName);
+
+  // Captura todos los valores bajo aws.sqs.* excepto endpoint
+  const queues = Object.entries(flat)
+    .filter(([k]) => /^aws\.sqs\./i.test(k) && !/endpoint$/i.test(k))
+    .map(([, v]) => resolveSpring(v))
+    .filter(isResourceName);
+
+  // Captura todos los valores bajo aws.s3.* que terminen en bucket-name
+  const buckets = Object.entries(flat)
+    .filter(([k]) => /^aws\.s3\./i.test(k) && /bucket-name$/i.test(k))
+    .map(([, v]) => resolveSpring(v))
+    .filter(isResourceName);
+
   const topics  = extractNames(flat, /topic-name|topicname|topic-arn/i);
   const roles   = extractNames(flat, /role-name|rolename/i);
 
