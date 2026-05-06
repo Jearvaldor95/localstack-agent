@@ -1,0 +1,24 @@
+{
+  "name": "localstack-agent",
+  "version": "1.0.0",
+  "description": "Detecta recursos AWS en el código y los crea en LocalStack. Expone un MCP server.",
+  "main": "src/agent.js",
+  "bin": {
+    "localstack-agent": "./src/agent.js",
+    "localstack-mcp": "./mcp-server.js"
+  },
+  "scripts": {
+    "start": "node src/agent.js",
+    "mcp": "node mcp-server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.600.0",
+    "@aws-sdk/client-s3": "3.600.0",
+    "@aws-sdk/client-sqs": "3.600.0",
+    "@aws-sdk/client-sns": "3.600.0",
+    "@aws-sdk/client-iam": "3.600.0",
+    "@modelcontextprotocol/sdk": "1.11.0",
+    "js-yaml": "4.1.0",
+    "zod": "3.23.8"
+  }
+}
