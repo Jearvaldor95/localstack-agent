@@ -52,8 +52,16 @@ function extractNames(flat, keyPattern) {
     .filter(isResourceName);
 }
 
-function scanDynamoSchema(rootDir) {
-  const schema = { gsis: [] };
+// Extrae nombre del atributo: @DynamoDbAttribute("x") → "x", sino usa el nombre del getter
+function resolveAttrName(annotations, fieldName) {
+  const m = annotations.match(/@DynamoDbAttribute\s*\(\s*["']([^"']+)["']\s*\)/);
+  return m ? m[1] : fieldName.charAt(0).toLowerCase() + fieldName.slice(1);
+}
+
+// Retorna array de schemas únicos (deduplicados por pk+sk), uno por cada @DynamoDbBean
+function scanDynamoSchemas(rootDir) {
+  const schemas = [];
+  const seen = new Set();
   const queue = [rootDir];
 
   while (queue.length) {
@@ -68,8 +76,9 @@ function scanDynamoSchema(rootDir) {
       const content = fs.readFileSync(path.join(dir, entry.name), 'utf8');
       if (!/@DynamoDbBean/.test(content)) continue;
 
+      const schema = { gsis: [] };
       for (const [, annotations, , fieldName] of content.matchAll(/((?:@\w+[^)]*\)\s*)*)(public\s+\w+\s+get(\w+)\(\))/g)) {
-        const attr = fieldName.charAt(0).toLowerCase() + fieldName.slice(1);
+        const attr = resolveAttrName(annotations, fieldName);
         if (/@DynamoDbPartitionKey\b/.test(annotations) && !/@DynamoDbSecondary/.test(annotations)) {
           schema.pk = attr;
         } else if (/@DynamoDbSortKey\b/.test(annotations) && !/@DynamoDbSecondary/.test(annotations)) {
@@ -90,11 +99,13 @@ function scanDynamoSchema(rootDir) {
           }
         }
       }
-      if (schema.pk) break;
+      if (schema.pk) {
+        const key = `${schema.pk}|${schema.sk || ''}`;
+        if (!seen.has(key)) { seen.add(key); schemas.push(schema); }
+      }
     }
-    if (schema.pk) break;
   }
-  return schema.pk ? schema : null;
+  return schemas;
 }
 
 function parse(rootDir = process.cwd()) {
