@@ -109,8 +109,8 @@ async function provision(services, resources) {
 
     if (service === 'dynamodb') {
       const tables = cfg.tables?.length ? cfg.tables : ['default-table'];
-      const schema = cfg.schema || {};
-      for (const t of tables) await createTable(t, schema);
+      const schemasByTable = cfg.schemasByTable || new Map();
+      for (const t of tables) await createTable(t, schemasByTable.get(t) || {});
     }
     if (service === 'sqs') {
       const queues = cfg.queues?.length ? cfg.queues : ['default-queue'];
