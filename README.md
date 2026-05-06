@@ -104,6 +104,12 @@ Busca un archivo `application.yaml` o `application.yml` en el proyecto y extrae 
 
 Resuelve placeholders de Spring Boot (`${VAR:default}` → `default`) y descarta URLs, ARNs y rutas.
 
+Para DynamoDB, asocia cada tabla a su esquema correcto siguiendo el patrón Spring:
+
+1. Escanea clases `@DynamoDbBean` y extrae PK, SK y GSIs usando `@DynamoDbAttribute`
+2. Escanea repositories que inyectan el nombre de tabla via `@Value("${aws.dynamodb.X}")` y referencian la entidad en el generic (`extends TemplateAdapterOperations<..., MiEntidadDynamoEntity>`)
+3. Construye un mapa `tableName → schema` para que cada tabla se cree con su propio esquema
+
 Para DynamoDB, también escanea clases Java anotadas con `@DynamoDbBean` para extraer automáticamente la PK, SK y GSIs del esquema.
 
 ### 3. Provisionamiento (`src/provisioner.js`)
@@ -126,16 +132,18 @@ Crea los recursos en LocalStack usando los AWS SDKs v3. Si un recurso ya existe,
 ```yaml
 aws:
   dynamodb:
-    table-name: usuarios
+    endpoint: "${AWS_DYNAMO_ENDPOINT:http://localhost:4566}"
+    cashback-benefit: "${DYNAMO_TABLE_CASHBACK_BENEFIT_NAME:table-rewards-co-cashback-benefit-local}"
+    transaction: "${DYNAMO_TABLE_TRANSACTION_NAME:table-rewards-co-transaction-local}"
   sqs:
-    queue-name: pedidos-queue
+    endpoint: "${AWS_SQS_ENDPOINT:http://localhost:4566}"
+    pedidos-queue: "${SQS_PEDIDOS_QUEUE:pedidos-queue-local}"
   s3:
-    bucket-name: archivos-app
-  sns:
-    topic-name: notificaciones
+    bills-bucket-name: "${AWS_S3_BILLS_BUCKET_NAME:nequi-bills-assets}"
+    app-bucket-name: "${AWS_S3_APP_BUCKET_NAME:mobile-app-assets-local}"
 ```
 
-Con este archivo, el agente creará la tabla `usuarios`, la cola `pedidos-queue`, el bucket `archivos-app` y el topic `notificaciones` en LocalStack.
+Con este archivo el agente creará las tablas `table-rewards-co-cashback-benefit-local` y `table-rewards-co-transaction-local`, la cola `pedidos-queue-local` y los buckets `nequi-bills-assets` y `mobile-app-assets-local` en LocalStack, cada tabla con el esquema (PK/SK/GSIs) de su entidad `@DynamoDbBean` correspondiente.
 
 ---
 

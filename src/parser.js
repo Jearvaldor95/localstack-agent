@@ -58,12 +58,10 @@ function resolveAttrName(annotations, fieldName) {
   return m ? m[1] : fieldName.charAt(0).toLowerCase() + fieldName.slice(1);
 }
 
-// Retorna array de schemas únicos (deduplicados por pk+sk), uno por cada @DynamoDbBean
-function scanDynamoSchemas(rootDir) {
-  const schemas = [];
-  const seen = new Set();
+// Escanea todas las entidades @DynamoDbBean → Map<SimpleClassName, schema>
+function scanEntitySchemas(rootDir) {
+  const map = new Map();
   const queue = [rootDir];
-
   while (queue.length) {
     const dir = queue.shift();
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -72,7 +70,6 @@ function scanDynamoSchemas(rootDir) {
         continue;
       }
       if (!entry.name.endsWith('.java')) continue;
-
       const content = fs.readFileSync(path.join(dir, entry.name), 'utf8');
       if (!/@DynamoDbBean/.test(content)) continue;
 
@@ -100,12 +97,61 @@ function scanDynamoSchemas(rootDir) {
         }
       }
       if (schema.pk) {
-        const key = `${schema.pk}|${schema.sk || ''}`;
-        if (!seen.has(key)) { seen.add(key); schemas.push(schema); }
+        const className = entry.name.replace('.java', '');
+        map.set(className, schema);
       }
     }
   }
-  return schemas;
+  return map;
+}
+
+// Escanea repositories: extrae @Value("${aws.dynamodb.X}") → yamlKey, y entidad del generic
+// Retorna Map<yamlKey, schema>
+function scanRepositoryMappings(rootDir, entitySchemas, flat) {
+  const result = new Map();
+  const queue = [rootDir];
+  while (queue.length) {
+    const dir = queue.shift();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!IGNORE_DIRS.includes(entry.name)) queue.push(path.join(dir, entry.name));
+        continue;
+      }
+      if (!entry.name.endsWith('.java')) continue;
+      const content = fs.readFileSync(path.join(dir, entry.name), 'utf8');
+
+      // Busca @Value("${aws.dynamodb.X}") en el constructor
+      const valueMatch = content.match(/@Value\s*\(\s*["']\$\{(aws\.dynamodb\.[^}:]+)[^}]*\}["']\s*\)/);
+      if (!valueMatch) continue;
+
+      const yamlKey = valueMatch[1]; // e.g. "aws.dynamodb.cashback-benefit"
+
+      // Busca la clase de entidad en el generic: extends TemplateAdapterOperations<..., EntityClass>
+      const genericMatch = content.match(/extends\s+\w+<[^>]*,\s*(\w+DynamoEntity)/);
+      if (!genericMatch) continue;
+
+      const entityClass = genericMatch[1];
+      const schema = entitySchemas.get(entityClass);
+      if (schema) result.set(yamlKey, schema);
+    }
+  }
+  return result;
+}
+
+// Retorna Map<tableName, schema>
+function scanDynamoSchemas(rootDir, flat) {
+  const entitySchemas = scanEntitySchemas(rootDir);
+  const repoMappings = scanRepositoryMappings(rootDir, entitySchemas, flat);
+
+  // Convierte yamlKey → tableName usando el flat del YAML
+  const result = new Map();
+  for (const [yamlKey, schema] of repoMappings) {
+    const rawValue = flat[yamlKey];
+    if (!rawValue) continue;
+    const tableName = resolveSpring(rawValue);
+    if (isResourceName(tableName)) result.set(tableName, schema);
+  }
+  return result;
 }
 
 function parse(rootDir = process.cwd()) {
@@ -138,9 +184,8 @@ function parse(rootDir = process.cwd()) {
   const roles   = extractNames(flat, /role-name|rolename/i);
 
   if (tables.length) {
-    const schemas = scanDynamoSchemas(rootDir);
-    // schemas[0] es el fallback si solo hay un esquema; provisioner usará el índice por tabla
-    resources.dynamodb = { tables, schemas };
+    const schemasByTable = scanDynamoSchemas(rootDir, flat);
+    resources.dynamodb = { tables, schemasByTable };
   }
   if (queues.length)  resources.sqs = { queues };
   if (buckets.length) resources.s3  = { buckets };
