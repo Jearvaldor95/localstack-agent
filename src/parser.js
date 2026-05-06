@@ -138,8 +138,9 @@ function parse(rootDir = process.cwd()) {
   const roles   = extractNames(flat, /role-name|rolename/i);
 
   if (tables.length) {
-    const schema = scanDynamoSchema(rootDir);
-    resources.dynamodb = { tables, ...(schema ? { schema } : {}) };
+    const schemas = scanDynamoSchemas(rootDir);
+    // schemas[0] es el fallback si solo hay un esquema; provisioner usará el índice por tabla
+    resources.dynamodb = { tables, schemas };
   }
   if (queues.length)  resources.sqs = { queues };
   if (buckets.length) resources.s3  = { buckets };
