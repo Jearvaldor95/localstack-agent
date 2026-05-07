@@ -8,8 +8,9 @@
     "localstack-mcp": "./mcp-server.js"
   },
   "scripts": {
-    "start": "node src/agent.js",
-    "mcp": "node mcp-server.js"
+    "start": "node mcp-server-http.js",
+    "start:local": "node mcp-server.js",
+    "agent": "node src/agent.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.600.0",
@@ -20,5 +21,8 @@
     "@modelcontextprotocol/sdk": "1.11.0",
     "js-yaml": "4.1.0",
     "zod": "3.23.8"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
