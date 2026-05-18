@@ -30,13 +30,29 @@ Puede usarse como **CLI**, como **script Node.js** o como **servidor MCP** (Mode
 # Con Docker
 docker run --rm -p 4566:4566 localstack/localstack
 
+# Con Podman
+podman run --rm -p 4566:4566 localstack/localstack
+
 # O con localstack CLI
 localstack start
 ```
 
+> También es compatible con **MiniStack** o cualquier emulador que exponga la API de LocalStack. Si usa un puerto distinto al `4566`, ajusta la variable de entorno:
+> ```bash
+> LOCALSTACK_ENDPOINT=http://localhost:PUERTO localstack-agent
+> ```
+
 ---
 
 ## Instalación
+
+### Desde npm (recomendado)
+
+```bash
+npm install -g localstack-agent
+```
+
+### Local (clonar el repositorio)
 
 ```bash
 git clone <repo-url>
@@ -52,16 +68,16 @@ npm install
 
 ```bash
 # Escanear el directorio actual
-node src/agent.js
+localstack-agent
 
 # Escanear un proyecto específico
-node src/agent.js /ruta/al/proyecto
+localstack-agent /ruta/al/proyecto
 ```
 
 ### Como servidor MCP
 
 ```bash
-node mcp-server.js
+localstack-agent-mcp
 ```
 
 El servidor MCP expone la herramienta `provision_localstack` que acepta un `projectPath` y devuelve el log de los recursos creados.
@@ -72,8 +88,8 @@ El servidor MCP expone la herramienta `provision_localstack` que acepta un `proj
 {
   "mcpServers": {
     "localstack-agent": {
-      "command": "node",
-      "args": ["C:/Users/Usuario/localstack-agent/mcp-server.js"]
+      "command": "npx",
+      "args": ["localstack-agent-mcp"]
     }
   }
 }
@@ -110,8 +126,6 @@ Para DynamoDB, asocia cada tabla a su esquema correcto siguiendo el patrón Spri
 2. Escanea repositories que inyectan el nombre de tabla via `@Value("${aws.dynamodb.X}")` y referencian la entidad en el generic (`extends TemplateAdapterOperations<..., MiEntidadDynamoEntity>`)
 3. Construye un mapa `tableName → schema` para que cada tabla se cree con su propio esquema
 
-Para DynamoDB, también escanea clases Java anotadas con `@DynamoDbBean` para extraer automáticamente la PK, SK y GSIs del esquema.
-
 ### 3. Provisionamiento (`src/provisioner.js`)
 
 Crea los recursos en LocalStack usando los AWS SDKs v3. Si un recurso ya existe, lo omite sin error. Si no se encontró configuración YAML, usa nombres por defecto (`default-table`, `default-queue`, etc.).
@@ -133,17 +147,17 @@ Crea los recursos en LocalStack usando los AWS SDKs v3. Si un recurso ya existe,
 aws:
   dynamodb:
     endpoint: "${AWS_DYNAMO_ENDPOINT:http://localhost:4566}"
-    cashback-benefit: "${DYNAMO_TABLE_CASHBACK_BENEFIT_NAME:table-rewards-co-cashback-benefit-local}"
-    transaction: "${DYNAMO_TABLE_TRANSACTION_NAME:table-rewards-co-transaction-local}"
+    orders: "${DYNAMO_TABLE_ORDERS_NAME:orders-table-local}"
+    users: "${DYNAMO_TABLE_USERS_NAME:users-table-local}"
   sqs:
     endpoint: "${AWS_SQS_ENDPOINT:http://localhost:4566}"
-    pedidos-queue: "${SQS_PEDIDOS_QUEUE:pedidos-queue-local}"
+    orders-queue: "${SQS_ORDERS_QUEUE:orders-queue-local}"
   s3:
-    bills-bucket-name: "${AWS_S3_BILLS_BUCKET_NAME:nequi-bills-assets}"
-    app-bucket-name: "${AWS_S3_APP_BUCKET_NAME:mobile-app-assets-local}"
+    files-bucket-name: "${AWS_S3_FILES_BUCKET_NAME:files-bucket-local}"
+    assets-bucket-name: "${AWS_S3_ASSETS_BUCKET_NAME:assets-bucket-local}"
 ```
 
-Con este archivo el agente creará las tablas `table-rewards-co-cashback-benefit-local` y `table-rewards-co-transaction-local`, la cola `pedidos-queue-local` y los buckets `nequi-bills-assets` y `mobile-app-assets-local` en LocalStack, cada tabla con el esquema (PK/SK/GSIs) de su entidad `@DynamoDbBean` correspondiente.
+Con este archivo el agente creará las tablas `orders-table-local` y `users-table-local`, la cola `orders-queue-local` y los buckets `files-bucket-local` y `assets-bucket-local` en LocalStack, cada tabla con el esquema (PK/SK/GSIs) de su entidad `@DynamoDbBean` correspondiente.
 
 ---
 
