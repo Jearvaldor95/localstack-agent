@@ -5,11 +5,14 @@
   "main": "src/agent.js",
   "bin": {
     "localstack-agent": "./src/agent.js",
-    "localstack-mcp": "./mcp-server.js"
+    "localstack-agent-mcp": "./mcp-server.js"
   },
+  "files": [
+    "src/",
+    "mcp-server.js"
+  ],
   "scripts": {
-    "start": "node mcp-server-http.js",
-    "start:local": "node mcp-server.js",
+    "start": "node mcp-server.js",
     "agent": "node src/agent.js"
   },
   "dependencies": {
