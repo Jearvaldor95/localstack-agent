@@ -46,10 +46,20 @@ localstack start
 
 ## Instalación
 
-### Desde npm (recomendado)
+### Desde npm (global)
 
 ```bash
 npm install -g localstack-agent
+```
+
+### Sin instalación (npx)
+
+```bash
+# Escanear el directorio actual
+npx localstack-agent
+
+# Escanear un proyecto específico
+npx localstack-agent /ruta/al/proyecto
 ```
 
 ### Local (clonar el repositorio)
@@ -114,17 +124,23 @@ Busca un archivo `application.yaml` o `application.yml` en el proyecto y extrae 
 |---------------------------|-----------------------------------------------|----------------|
 | `aws.dynamodb.*`          | Todos los valores (excepto `endpoint`)        | Tabla DynamoDB |
 | `aws.sqs.*`               | Todos los valores (excepto `endpoint`)        | Cola SQS       |
-| `aws.s3.*-bucket-name`    | Claves que terminen en `bucket-name`          | Bucket S3      |
+| `aws.s3.*-bucket-name` / `aws.s3.*.bucket` | Claves que terminen en `bucket-name` o `bucket` | Bucket S3 |
 | `topic-name`, `topic-arn` | Claves con ese nombre en cualquier nivel      | Topic SNS      |
 | `role-name`, `rolename`   | Claves con ese nombre en cualquier nivel      | Rol IAM        |
 
 Resuelve placeholders de Spring Boot (`${VAR:default}` → `default`) y descarta URLs, ARNs y rutas.
 
-Para DynamoDB, asocia cada tabla a su esquema correcto siguiendo el patrón Spring:
+Para DynamoDB, asocia cada tabla a su esquema correcto siguiendo dos estrategias:
 
+**Patrón entidad (`@DynamoDbBean`):**
 1. Escanea clases `@DynamoDbBean` y extrae PK, SK y GSIs usando `@DynamoDbAttribute`
 2. Escanea repositories que inyectan el nombre de tabla via `@Value("${aws.dynamodb.X}")` y referencian la entidad en el generic (`extends TemplateAdapterOperations<..., MiEntidadDynamoEntity>`)
 3. Construye un mapa `tableName → schema` para que cada tabla se cree con su propio esquema
+
+**Patrón SDK directo (sin `@DynamoDbBean`):**
+1. Detecta repositories con `@Value("${aws.dynamodb.X}")` que construyen la key manualmente (e.g. `Map.of(FIELD, ...)`)
+2. Resuelve la constante `String` usada como clave para inferir el PK
+3. Usa ese PK si no se encontró un esquema por el patrón de entidad
 
 ### 3. Provisionamiento (`src/provisioner.js`)
 
