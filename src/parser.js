@@ -138,12 +138,55 @@ function scanRepositoryMappings(rootDir, entitySchemas, flat) {
   return result;
 }
 
+// Escanea repositorios que usan el SDK directamente (sin @DynamoDbBean)
+// Detecta el PK buscando la constante usada en buildKey() → Map.of(FIELD, ...)
+function scanRawRepositorySchemas(rootDir, flat) {
+  const result = new Map();
+  const queue = [rootDir];
+  while (queue.length) {
+    const dir = queue.shift();
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        if (!IGNORE_DIRS.includes(entry.name)) queue.push(path.join(dir, entry.name));
+        continue;
+      }
+      if (!entry.name.endsWith('.java')) continue;
+      const content = fs.readFileSync(path.join(dir, entry.name), 'utf8');
+
+      const valueMatch = content.match(/@Value\s*\(\s*["']\$\{(aws\.dynamodb\.[^}:]+)[^}]*\}["']\s*\)/);
+      if (!valueMatch) continue;
+      // Solo aplica si NO extiende TemplateAdapterOperations (esos ya los maneja scanRepositoryMappings)
+      if (/extends\s+\w+<[^>]*,\s*\w+DynamoEntity/.test(content)) continue;
+
+      const yamlKey = valueMatch[1];
+      const rawValue = flat[yamlKey];
+      if (!rawValue) continue;
+      const tableName = resolveSpring(rawValue);
+      if (!isResourceName(tableName)) continue;
+
+      // Busca constantes String: private static final String X = "valor";
+      const constants = new Map();
+      for (const [, name, value] of content.matchAll(/private\s+static\s+final\s+String\s+(\w+)\s*=\s*"([^"]+)"/g)) {
+        constants.set(name, value);
+      }
+
+      // Busca Map.of(FIELD, ...) dentro de buildKey o método que construya la key
+      const keyMatch = content.match(/Map\.of\s*\(\s*(\w+)\s*,/);
+      if (!keyMatch) continue;
+
+      const pkConstant = keyMatch[1];
+      const pk = constants.get(pkConstant);
+      if (pk) result.set(tableName, { pk, gsis: [] });
+    }
+  }
+  return result;
+}
+
 // Retorna Map<tableName, schema>
 function scanDynamoSchemas(rootDir, flat) {
   const entitySchemas = scanEntitySchemas(rootDir);
   const repoMappings = scanRepositoryMappings(rootDir, entitySchemas, flat);
 
-  // Convierte yamlKey → tableName usando el flat del YAML
   const result = new Map();
   for (const [yamlKey, schema] of repoMappings) {
     const rawValue = flat[yamlKey];
@@ -151,6 +194,12 @@ function scanDynamoSchemas(rootDir, flat) {
     const tableName = resolveSpring(rawValue);
     if (isResourceName(tableName)) result.set(tableName, schema);
   }
+
+  // Fusiona esquemas de repositorios raw (no sobreescribe los ya detectados)
+  for (const [tableName, schema] of scanRawRepositorySchemas(rootDir, flat)) {
+    if (!result.has(tableName)) result.set(tableName, schema);
+  }
+
   return result;
 }
 
@@ -174,9 +223,9 @@ function parse(rootDir = process.cwd()) {
     .map(([, v]) => resolveSpring(v))
     .filter(isResourceName);
 
-  // Captura todos los valores bajo aws.s3.* que terminen en bucket-name
+  // Captura todos los valores bajo aws.s3.* que terminen en bucket-name o bucket
   const buckets = Object.entries(flat)
-    .filter(([k]) => /^aws\.s3\./i.test(k) && /bucket-name$/i.test(k))
+    .filter(([k]) => /^aws\.s3\./i.test(k) && /bucket(-name)?$/i.test(k))
     .map(([, v]) => resolveSpring(v))
     .filter(isResourceName);
 
