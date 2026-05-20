@@ -1,6 +1,6 @@
 {
   "name": "localstack-agent",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Detecta recursos AWS en el código y los crea en LocalStack. Expone un MCP server.",
   "main": "src/agent.js",
   "bin": {
