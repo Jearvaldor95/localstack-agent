@@ -46,10 +46,20 @@ localstack start
 
 ## Instalación
 
-### Desde npm (recomendado)
+### Desde npm (global)
 
 ```bash
 npm install -g localstack-agent
+```
+
+### Sin instalación (npx)
+
+```bash
+# Escanear el directorio actual
+npx localstack-agent
+
+# Escanear un proyecto específico
+npx localstack-agent /ruta/al/proyecto
 ```
 
 ### Local (clonar el repositorio)
